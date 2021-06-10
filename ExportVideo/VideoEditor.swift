@@ -9,6 +9,9 @@ import UIKit
 import AVFoundation
 
 final class VideoEditor {
+    var assetReader: AVAssetReader?
+    var assetWriter: AVAssetWriter?
+    
     func export(fromVideoAt videoURL: URL, onComplete: @escaping (URL?) -> Void) {
         export(fromVideo: videoURL, to: .MP4, completionHandler: onComplete)
 //        changeBitrate(url: videoURL, completion: onComplete)
@@ -70,9 +73,6 @@ final class VideoEditor {
         var audioFinished = false
         var videoFinished = false
         let asset = AVAsset(url: url)
-        
-        var assetReader: AVAssetReader?
-        var assetWriter: AVAssetWriter?
         
         //create asset reader
         do{
