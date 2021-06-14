@@ -13,11 +13,15 @@ final class VideoEditor {
     var assetWriter: AVAssetWriter?
     
     func export(fromVideoAt videoURL: URL, onComplete: @escaping (URL?) -> Void) {
-        export(fromVideo: videoURL, to: .MP4, completionHandler: onComplete)
-//        changeBitrate(url: videoURL, completion: onComplete)
+        // changeFormat(of: videoURL, to: .MP4, completionHandler: onComplete)
+        // changeBitrate(url: videoURL, completion: onComplete)
+        trimDuration(of: videoURL,
+                     from: 0,
+                     to: 3,
+                     completionHandler: onComplete)
     }
     
-    func export(fromVideo videoURL: URL, to type: MediaType, completionHandler: @escaping (URL?) -> Void) {
+    func changeFormat(of videoURL: URL, to type: MediaType, completionHandler: @escaping (URL?) -> Void) {
         guard videoURL.pathExtension != type.fileExtension() else {
             print("Same file format")
             completionHandler(nil)
@@ -185,6 +189,68 @@ final class VideoEditor {
                         closeWriter()
                     }
                     break
+                }
+            }
+        }
+    }
+    
+    func trimDuration(of videoURL: URL, from: TimeInterval, to: TimeInterval, completionHandler: @escaping ((URL?) -> Void)) {
+        let asset = AVAsset(url: videoURL)
+        
+        guard from >= 0, to <= asset.duration.seconds else {
+            completionHandler(nil)
+            return
+        }
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'"
+        let preset = AVAssetExportPresetHighestQuality
+        let outFileType = AVFileType.mp4
+        let outputUrl = URL(fileURLWithPath: NSTemporaryDirectory())
+          .appendingPathComponent(formatter.string(from: Date()))
+            .appendingPathExtension(MediaType.MOV.fileExtension())
+        
+        AVAssetExportSession.determineCompatibility(ofExportPreset: preset,
+                                                    with: asset,
+                                                    outputFileType: outFileType) { isCompatible in
+            guard isCompatible else {
+                completionHandler(nil)
+                return
+            }
+            // Compatibility check succeeded, continue with export.
+            guard let exportSession = AVAssetExportSession(asset: asset,
+                                                           presetName: preset) else {
+                completionHandler(nil)
+                return
+            }
+            
+            exportSession.outputURL =  outputUrl
+            exportSession.shouldOptimizeForNetworkUse = true
+            exportSession.outputFileType = .mov
+            let start = CMTimeMakeWithSeconds(from, preferredTimescale: 600)
+            let duration = CMTimeMakeWithSeconds(to - from, preferredTimescale: 600)
+            
+            
+            let range = CMTimeRangeMake(start: start, duration: duration)
+            exportSession.timeRange = range
+            
+            exportSession.exportAsynchronously {
+                // Handle export results.
+                switch exportSession.status {
+                case .failed:
+                    print(exportSession.error ?? "NO ERROR")
+                    completionHandler(nil)
+                case .cancelled:
+                    print("Export canceled")
+                    completionHandler(nil)
+                case .completed:
+                    //Video conversion finished
+                    print("Successful!")
+                    print(exportSession.outputURL ?? "NO OUTPUT URL")
+                    completionHandler(exportSession.outputURL)
+                case .unknown:
+                    print("Export Unknown Error")
+                default: break
                 }
             }
         }
