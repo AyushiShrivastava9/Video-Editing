@@ -15,10 +15,11 @@ final class VideoEditor {
     func export(fromVideoAt videoURL: URL, onComplete: @escaping (URL?) -> Void) {
         // changeFormat(of: videoURL, to: .MP4, completionHandler: onComplete)
         // changeBitrate(url: videoURL, completion: onComplete)
-        trimDuration(of: videoURL,
-                     from: 0,
-                     to: 3,
-                     completionHandler: onComplete)
+//        trimDuration(of: videoURL,
+//                     from: 0,
+//                     to: 3,
+//                     completion: onComplete)
+//        changeResolution(videoUrl: videoURL, preset: AVAssetExportPresetLowQuality, completion: onComplete)
     }
     
     func changeFormat(of videoURL: URL, to type: MediaType, completionHandler: @escaping (URL?) -> Void) {
@@ -194,11 +195,11 @@ final class VideoEditor {
         }
     }
     
-    func trimDuration(of videoURL: URL, from: TimeInterval, to: TimeInterval, completionHandler: @escaping ((URL?) -> Void)) {
+    func trimDuration(of videoURL: URL, from: TimeInterval, to: TimeInterval, completion: @escaping ((URL?) -> Void)) {
         let asset = AVAsset(url: videoURL)
         
         guard from >= 0, to <= asset.duration.seconds else {
-            completionHandler(nil)
+            completion(nil)
             return
         }
         
@@ -214,13 +215,13 @@ final class VideoEditor {
                                                     with: asset,
                                                     outputFileType: outFileType) { isCompatible in
             guard isCompatible else {
-                completionHandler(nil)
+                completion(nil)
                 return
             }
             // Compatibility check succeeded, continue with export.
             guard let exportSession = AVAssetExportSession(asset: asset,
                                                            presetName: preset) else {
-                completionHandler(nil)
+                completion(nil)
                 return
             }
             
@@ -239,15 +240,67 @@ final class VideoEditor {
                 switch exportSession.status {
                 case .failed:
                     print(exportSession.error ?? "NO ERROR")
-                    completionHandler(nil)
+                    completion(nil)
                 case .cancelled:
                     print("Export canceled")
-                    completionHandler(nil)
+                    completion(nil)
                 case .completed:
                     //Video conversion finished
                     print("Successful!")
                     print(exportSession.outputURL ?? "NO OUTPUT URL")
-                    completionHandler(exportSession.outputURL)
+                    completion(exportSession.outputURL)
+                case .unknown:
+                    print("Export Unknown Error")
+                default: break
+                }
+            }
+        }
+    }
+    
+    func changeResolution(videoUrl: URL,
+                   presetName: String = AVAssetExportPresetHighestQuality,
+                   completion: @escaping ((URL?) -> Void)) {
+        let asset = AVAsset(url: videoUrl)
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'"
+        let outFileType = AVFileType.mp4
+        let outputUrl = URL(fileURLWithPath: NSTemporaryDirectory())
+          .appendingPathComponent(formatter.string(from: Date()))
+            .appendingPathExtension(MediaType.MOV.fileExtension())
+        
+        AVAssetExportSession.determineCompatibility(ofExportPreset: preset,
+                                                    with: asset,
+                                                    outputFileType: outFileType) { isCompatible in
+            guard isCompatible else {
+                completion(nil)
+                return
+            }
+            // Compatibility check succeeded, continue with export.
+            guard let exportSession = AVAssetExportSession(asset: asset,
+                                                           presetName: preset) else {
+                completion(nil)
+                return
+            }
+            
+            exportSession.outputURL =  outputUrl
+            exportSession.shouldOptimizeForNetworkUse = true
+            exportSession.outputFileType = .mov
+            
+            exportSession.exportAsynchronously {
+                // Handle export results.
+                switch exportSession.status {
+                case .failed:
+                    print(exportSession.error ?? "NO ERROR")
+                    completion(nil)
+                case .cancelled:
+                    print("Export canceled")
+                    completion(nil)
+                case .completed:
+                    //Video conversion finished
+                    print("Successful!")
+                    print(exportSession.outputURL ?? "NO OUTPUT URL")
+                    completion(exportSession.outputURL)
                 case .unknown:
                     print("Export Unknown Error")
                 default: break
