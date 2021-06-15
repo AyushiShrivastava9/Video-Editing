@@ -2,8 +2,8 @@
 
 Using AVFoundation apis to export videos by changing:
 
-1. format
-2. video bit rate 
-3. trimming
+1. Format
+2. Video bit rate 
+3. Trimming
 4. Resolution
 5. Merge 2 videos
