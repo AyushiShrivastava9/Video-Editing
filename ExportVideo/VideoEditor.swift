@@ -19,7 +19,8 @@ final class VideoEditor {
 //                     from: 0,
 //                     to: 3,
 //                     completion: onComplete)
-//        changeResolution(videoUrl: videoURL, preset: AVAssetExportPresetLowQuality, completion: onComplete)
+//        changeResolution(videoUrl: videoURL, presetName: AVAssetExportPresetLowQuality, completion: onComplete)
+        mergeVideos(firstVideoURL: videoURL, secondVideoURL: videoURL, completion: onComplete)
     }
     
     func changeFormat(of videoURL: URL, to type: MediaType, completionHandler: @escaping (URL?) -> Void) {
@@ -34,9 +35,7 @@ final class VideoEditor {
         formatter.dateFormat = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'"
         let preset = AVAssetExportPresetHighestQuality
         let outFileType = AVFileType.mp4
-        let outputUrl = URL(fileURLWithPath: NSTemporaryDirectory())
-          .appendingPathComponent(formatter.string(from: Date()))
-            .appendingPathExtension(type.fileExtension())
+        let outputUrl = outputUrl(for: type)
         
         AVAssetExportSession.determineCompatibility(ofExportPreset: preset,
                                                     with: asset,
@@ -70,11 +69,7 @@ final class VideoEditor {
     }
     
     private func changeBitrate(url: URL, completion:@escaping (URL?) -> Void) {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'"
-        let outputURL = URL(fileURLWithPath: NSTemporaryDirectory())
-          .appendingPathComponent(formatter.string(from: Date()))
-            .appendingPathExtension("mov")
+        let outputURL = outputUrl(for: .MOV)
         var audioFinished = false
         var videoFinished = false
         let asset = AVAsset(url: url)
@@ -207,9 +202,7 @@ final class VideoEditor {
         formatter.dateFormat = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'"
         let preset = AVAssetExportPresetHighestQuality
         let outFileType = AVFileType.mp4
-        let outputUrl = URL(fileURLWithPath: NSTemporaryDirectory())
-          .appendingPathComponent(formatter.string(from: Date()))
-            .appendingPathExtension(MediaType.MOV.fileExtension())
+        let outputUrl = outputUrl(for: .MOV)
         
         AVAssetExportSession.determineCompatibility(ofExportPreset: preset,
                                                     with: asset,
@@ -264,21 +257,18 @@ final class VideoEditor {
         
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'"
-        let outFileType = AVFileType.mp4
-        let outputUrl = URL(fileURLWithPath: NSTemporaryDirectory())
-          .appendingPathComponent(formatter.string(from: Date()))
-            .appendingPathExtension(MediaType.MOV.fileExtension())
+        let outputUrl = outputUrl(for: .MOV)
         
-        AVAssetExportSession.determineCompatibility(ofExportPreset: preset,
+        AVAssetExportSession.determineCompatibility(ofExportPreset: presetName,
                                                     with: asset,
-                                                    outputFileType: outFileType) { isCompatible in
+                                                    outputFileType: MediaType.MOV.getFileType()) { isCompatible in
             guard isCompatible else {
                 completion(nil)
                 return
             }
             // Compatibility check succeeded, continue with export.
             guard let exportSession = AVAssetExportSession(asset: asset,
-                                                           presetName: preset) else {
+                                                           presetName: presetName) else {
                 completion(nil)
                 return
             }
@@ -307,5 +297,142 @@ final class VideoEditor {
                 }
             }
         }
+    }
+    
+    func mergeVideos(firstVideoURL: URL, secondVideoURL: URL, completion: @escaping (URL?) -> Void) {
+            let firstAsset = AVAsset(url: firstVideoURL)
+            let secondAsset = AVAsset(url: secondVideoURL)
+        
+        let mixComposition = AVMutableComposition()
+        
+        // First video and audio
+        guard
+          let firstTrack = mixComposition.addMutableTrack(
+            withMediaType: .video,
+            preferredTrackID: Int32(kCMPersistentTrackID_Invalid))
+          else { return }
+        
+        do {
+          try firstTrack.insertTimeRange(
+            CMTimeRangeMake(start: .zero, duration: firstAsset.duration), // Can also trim videos here
+            of: firstAsset.tracks(withMediaType: .video)[0],
+            at: .zero)
+        } catch {
+          print("Failed to load first track")
+          return
+        }
+        
+        guard
+          let firstAudioTrack = mixComposition.addMutableTrack(
+            withMediaType: .audio,
+            preferredTrackID: 0)
+          else { return }
+        
+        do {
+          try firstAudioTrack.insertTimeRange(
+            CMTimeRangeMake(start: .zero, duration: firstAsset.duration), // Can also trim videos here
+            of: firstAsset.tracks(withMediaType: .audio)[0],
+            at: .zero)
+        } catch {
+          print("Failed to load first audio track")
+          return
+        }
+        
+        // Second video and audio
+        
+        guard
+          let secondTrack = mixComposition.addMutableTrack(
+            withMediaType: .video,
+            preferredTrackID: Int32(kCMPersistentTrackID_Invalid))
+          else { return }
+            
+        do {
+          try secondTrack.insertTimeRange(
+            CMTimeRangeMake(start: .zero, duration: secondAsset.duration),
+            of: secondAsset.tracks(withMediaType: .video)[0],
+            at: firstAsset.duration)
+        } catch {
+          print("Failed to load second track")
+          return
+        }
+        
+        guard
+          let secondAudioTrack = mixComposition.addMutableTrack(
+            withMediaType: .audio,
+            preferredTrackID: 0)
+          else { return }
+        
+        do {
+          try secondAudioTrack.insertTimeRange(
+            CMTimeRangeMake(start: .zero, duration: secondAsset.duration), // Can also trim videos here
+            of: secondAsset.tracks(withMediaType: .audio)[0],
+            at: firstAsset.duration)
+        } catch {
+          print("Failed to load second audio track")
+          return
+        }
+        
+        // Merge both
+        let mainInstruction = AVMutableVideoCompositionInstruction()
+        mainInstruction.timeRange = CMTimeRangeMake(
+          start: .zero,
+          duration: CMTimeAdd(firstAsset.duration, secondAsset.duration))
+        
+        let firstInstruction = AVMutableVideoCompositionLayerInstruction(
+          assetTrack: firstTrack)
+        // first video becomes invisible when second starts
+        firstInstruction.setOpacity(0.0, at: firstAsset.duration)
+        let secondInstruction = AVMutableVideoCompositionLayerInstruction(
+          assetTrack: secondTrack)
+        
+        mainInstruction.layerInstructions = [firstInstruction, secondInstruction]
+        
+        let mainComposition = AVMutableVideoComposition()
+        mainComposition.instructions = [mainInstruction]
+        mainComposition.frameDuration = CMTimeMake(value: 1, timescale: 30)
+        mainComposition.renderSize = firstTrack.naturalSize // Same video we are merging
+        
+        let outputURL = outputUrl(for: .MOV)
+
+        AVAssetExportSession.determineCompatibility(ofExportPreset: AVAssetExportPresetHighestQuality,
+                                                    with: mixComposition,
+                                                    outputFileType: MediaType.MOV.getFileType()) { isCompatible in
+            guard isCompatible else { return }
+            // Compatibility check succeeded, continue with export.
+            guard let exportSession = AVAssetExportSession(
+                    asset: mixComposition,
+                    presetName: AVAssetExportPresetHighestQuality) else { return }
+            exportSession.outputURL = outputURL
+            exportSession.outputFileType = MediaType.MOV.getFileType()
+            exportSession.shouldOptimizeForNetworkUse = true
+            exportSession.videoComposition = mainComposition
+            exportSession.exportAsynchronously {
+                // Handle export results.
+                switch exportSession.status {
+                case .failed:
+                    print(exportSession.error ?? "NO ERROR")
+                    completion(nil)
+                case .cancelled:
+                    print("Export canceled")
+                    completion(nil)
+                case .completed:
+                    //Video conversion finished
+                    print("Successful!")
+                    print(exportSession.outputURL ?? "NO OUTPUT URL")
+                    completion(exportSession.outputURL)
+                case .unknown:
+                    print("Export Unknown Error")
+                default: break
+                }
+            }
+        }
+    }
+    
+    private func outputUrl(for type: MediaType) -> URL {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'"
+        return URL(fileURLWithPath: NSTemporaryDirectory())
+          .appendingPathComponent(formatter.string(from: Date()))
+            .appendingPathExtension(type.fileExtension())
     }
 }
