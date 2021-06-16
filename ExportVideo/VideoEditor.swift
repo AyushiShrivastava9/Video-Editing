@@ -14,13 +14,13 @@ final class VideoEditor {
     
     func export(fromVideoAt videoURL: URL, onComplete: @escaping (URL?) -> Void) {
         // changeFormat(of: videoURL, to: .MP4, completionHandler: onComplete)
-        // changeBitrate(url: videoURL, completion: onComplete)
+         //changeBitrate(url: videoURL, completion: onComplete)
 //        trimDuration(of: videoURL,
 //                     from: 0,
 //                     to: 3,
 //                     completion: onComplete)
 //        changeResolution(videoUrl: videoURL, presetName: AVAssetExportPresetLowQuality, completion: onComplete)
-        mergeVideos(firstVideoURL: videoURL, secondVideoURL: videoURL, completion: onComplete)
+//        mergeVideos(firstVideoURL: videoURL, secondVideoURL: videoURL, completion: onComplete)
     }
     
     func changeFormat(of videoURL: URL, to type: MediaType, completionHandler: @escaping (URL?) -> Void) {
@@ -36,7 +36,7 @@ final class VideoEditor {
         let preset = AVAssetExportPresetHighestQuality
         let outFileType = AVFileType.mp4
         let outputUrl = outputUrl(for: type)
-        
+
         AVAssetExportSession.determineCompatibility(ofExportPreset: preset,
                                                     with: asset,
                                                     outputFileType: outFileType) { isCompatible in
@@ -68,7 +68,7 @@ final class VideoEditor {
         }
     }
     
-    private func changeBitrate(url: URL, completion:@escaping (URL?) -> Void) {
+    private func changeBitrate(url: URL, completion: @escaping (Result<URL?, VideoConversionError>) -> Void) {
         let outputURL = outputUrl(for: .MOV)
         var audioFinished = false
         var videoFinished = false
@@ -82,14 +82,17 @@ final class VideoEditor {
         }
         
         guard let reader = assetReader else {
-            print("Could not initalize asset reader probably failed its try catch")
-            completion(nil)
+            // Could not initalize asset reader probably failed its try catch
+            completion(.failure(.invalidAssetReader))
             return
         }
         
-        guard let videoTrack = asset.tracks(withMediaType: .video).first,
-              let audioTrack = asset.tracks(withMediaType: .audio).first else {
-            completion(nil)
+        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+            completion(.failure(.invalidVideoTrack))
+            return
+        }
+        guard let audioTrack = asset.tracks(withMediaType: .audio).first else {
+            completion(.failure(.invalidAudioTrack))
             return
         }
         
@@ -110,20 +113,22 @@ final class VideoEditor {
         if reader.canAdd(assetReaderVideoOutput) {
             reader.add(assetReaderVideoOutput)
         } else {
-            fatalError("Couldn't add video output reader")
+            //Couldn't add video output reader
+            completion(.failure(.invalidVideoOutputReader))
         }
         
         if reader.canAdd(assetReaderAudioOutput){
             reader.add(assetReaderAudioOutput)
         } else {
-            fatalError("Couldn't add audio output reader")
+            //couldn't add audio output reader
+            completion(.failure(.invalidAudioOutputReader))
         }
         
         let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: nil)
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         videoInput.transform = videoTrack.preferredTransform
+
         //we need to add samples to the video input
-        
         let videoInputQueue = DispatchQueue(label: "videoQueue")
         let audioInputQueue = DispatchQueue(label: "audioQueue")
         
@@ -133,7 +138,8 @@ final class VideoEditor {
             assetWriter = nil
         }
         guard let writer = assetWriter else {
-            fatalError("assetWriter was nil")
+            completion(.failure(.invalidAssetWriter))
+            return
         }
         
         writer.shouldOptimizeForNetworkUse = true
@@ -146,10 +152,10 @@ final class VideoEditor {
         writer.startSession(atSourceTime: .zero)
         
         
-        let closeWriter:()-> Void = {
-            if (audioFinished && videoFinished){
+        let closeWriter:() -> Void = {
+            if (audioFinished && videoFinished) {
                 self.assetWriter?.finishWriting(completionHandler: {
-                    completion(self.assetWriter?.outputURL)
+                    completion(.success(self.assetWriter?.outputURL))
                 })
                 self.assetReader?.cancelReading()
             }
@@ -158,8 +164,7 @@ final class VideoEditor {
         
         audioInput.requestMediaDataWhenReady(on: audioInputQueue) {
             while(audioInput.isReadyForMoreMediaData) {
-                let sample = assetReaderAudioOutput.copyNextSampleBuffer()
-                if let sample = sample {
+                if let sample = assetReaderAudioOutput.copyNextSampleBuffer() {
                     audioInput.append(sample)
                 } else {
                     audioInput.markAsFinished()
@@ -175,8 +180,7 @@ final class VideoEditor {
         videoInput.requestMediaDataWhenReady(on: videoInputQueue) {
             //request data here
             while(videoInput.isReadyForMoreMediaData){
-                let sample = assetReaderVideoOutput.copyNextSampleBuffer()
-                if let sample = sample {
+                if let sample = assetReaderVideoOutput.copyNextSampleBuffer() {
                     videoInput.append(sample)
                 } else {
                     videoInput.markAsFinished()

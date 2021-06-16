@@ -18,6 +18,7 @@
 		CE2626F52670EAC400C126BB /* PlayerViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = CE2626F42670EAC400C126BB /* PlayerViewController.xib */; };
 		CE2626F72671FDE700C126BB /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE2626F62671FDE700C126BB /* Constants.swift */; };
 		CE2626F92672597400C126BB /* MediaType.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE2626F82672597400C126BB /* MediaType.swift */; };
+		CEC3B6852679E6C800642AB1 /* VideoConversionError.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC3B6842679E6C800642AB1 /* VideoConversionError.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +35,7 @@
 		CE2626F42670EAC400C126BB /* PlayerViewController.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = PlayerViewController.xib; sourceTree = "<group>"; };
 		CE2626F62671FDE700C126BB /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		CE2626F82672597400C126BB /* MediaType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaType.swift; sourceTree = "<group>"; };
+		CEC3B6842679E6C800642AB1 /* VideoConversionError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoConversionError.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +80,7 @@
 				CE2626F42670EAC400C126BB /* PlayerViewController.xib */,
 				CE2626F62671FDE700C126BB /* Constants.swift */,
 				CE2626F82672597400C126BB /* MediaType.swift */,
+				CEC3B6842679E6C800642AB1 /* VideoConversionError.swift */,
 			);
 			path = ExportVideo;
 			sourceTree = "<group>";
@@ -157,6 +160,7 @@
 				CE2626F32670DEC300C126BB /* VideoEditor.swift in Sources */,
 				CE2626ED2670D97A00C126BB /* PlayerViewController.swift in Sources */,
 				CE2626D92670D2DE00C126BB /* AppDelegate.swift in Sources */,
+				CEC3B6852679E6C800642AB1 /* VideoConversionError.swift in Sources */,
 				CE2626DB2670D2DE00C126BB /* SceneDelegate.swift in Sources */,
 				CE2626F72671FDE700C126BB /* Constants.swift in Sources */,
 				CE2626F92672597400C126BB /* MediaType.swift in Sources */,
